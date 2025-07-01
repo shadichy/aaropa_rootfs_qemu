@@ -1,4 +1,4 @@
-name: Generate base aaropa.img
+name: Generate qemu aaropa image
 
 on:
   schedule:
@@ -8,12 +8,8 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
-  build-and-publish-image:
+  build:
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -21,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     permissions:
-      contents: read
+      contents: write
       packages: write
       attestations: write
       id-token: write
@@ -36,34 +32,128 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install required packages
+        run: |
+          sudo apt update
+          sudo apt install -y qemu-utils parted dosfstools e2fsprogs xz-utils kpartx
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Build Docker Image
+        run: |
+          docker build -f Dockerfile . -t devuan
+          docker create --name devuan devuan echo "Devuan"
 
-      - name: Build and push Docker image
-        id: push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          target: ${{ github.event_name == 'workflow_dispatch' && 'base' || 'final' }}
+      - name: Build QEMU Image
+        run: |
+          qemu-img create -f qcow2 aaropa.qcow2 2G
 
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+          # Attach image
+          sudo modprobe nbd max_part=8
+          sudo qemu-nbd --connect=/dev/nbd0 aaropa.qcow2
+          sleep 2  # Give time for /dev/nbd0 to be ready
+
+          # Create partitions
+          sudo parted /dev/nbd0 -s mklabel gpt
+          sudo parted /dev/nbd0 -s mkpart ESP fat32 1MiB 101MiB
+          sudo parted /dev/nbd0 -s set 1 esp on
+          sudo parted /dev/nbd0 -s mkpart primary ext4 101MiB 100%
+
+          # Mount image
+          mkdir -p rootfs
+          sudo mount /dev/nbd0p2 rootfs
+          sudo mkdir -p rootfs/boot/efi
+          sudo mount /dev/nbd0p1 rootfs/boot/efi
+
+          # Export rootfs
+          docker export devuan | sudo tar -C rootfs -p -s -xv
+
+          # Install bootloader
+          sudo mount --bind /dev rootfs/dev
+          sudo mount --bind /proc rootfs/proc
+          sudo mount --bind /sys rootfs/sys
+          sudo chroot rootfs /bin/bash -c "grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot/efi/AAROPA --bootloader-id=AAROPA --removable --no-nvram; grub-mkconfig -o /boot/efi/AAROPA/grub.cfg"
+
+          # Detach image
+          sudo umount -R rootfs
+          sudo qemu-nbd --disconnect /dev/nbd0
+
+          # Compress image
+          xz -T0 -9e -c aaropa.qcow2 > aaropa.qcow2.xz
+
+      - name: Upload QEMU image
+        uses: actions/upload-artifact@v4
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+          name: aaropa.qcow2.xz
+          path: aaropa.qcow2.xz
+
+  release:
+    name: Release
+    needs: build
+    if: ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/tags/'))
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Download RootFS
+        id: download-rootfs
+        uses: actions/download-artifact@v4
+        with:
+          path: out
+          pattern: "*"
+          merge-multiple: true
+
+      - name: List Files
+        run: ls -R ${{ steps.download-rootfs.outputs.download-path }}
+
+      - uses: "softprops/action-gh-release@v2.1.0"
+        with:
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            ${{ steps.download-rootfs.outputs.download-path }}/*
+
+  monthly-release:
+    name: Monthly release
+    needs: build
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Download rootfs
+        id: download-rootfs
+        uses: actions/download-artifact@v4
+        with:
+          path: out
+          pattern: "*"
+          merge-multiple: true
+      - name: List Files
+        run: ls -R ${{ steps.download-rootfs.outputs.download-path }}
+    
+      - uses: "softprops/action-gh-release@v2.1.0"
+        with:
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          tag_name: "r${{ github.run_number }}"
+          name: "Monthly release r${{ github.run_number }}"
+          files: |
+            ${{ steps.download-rootfs.outputs.download-path }}/*
