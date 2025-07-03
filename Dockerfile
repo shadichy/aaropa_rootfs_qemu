@@ -1,6 +1,6 @@
 FROM ghcr.io/shadichy/aaropa_rootfs_base:main
 
-# COPY template /
+COPY template /
 COPY packages /
 
 RUN apt update && apt upgrade -y
