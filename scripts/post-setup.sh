@@ -25,4 +25,7 @@ update-rc.d dbus defaults
 update-rc.d udev defaults
 update-rc.d eudev defaults
 
+# Remove debian-specific boot configurations
+rm -f /etc/grub.d/*debian*
+
 exit 0
