@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -e
+ISO=$1
+
+usage() {
+	cat<<EOF
+Usage: $(basename $0) <iso>
+EOF
+}
+
+if [ -z "$ISO" ] || [ ! -f "$ISO" ]; then
+	usage
+	exit 1
+fi
+
+mount "$ISO" /cdrom
+
+if [ -f /cdrom/system.?fs ]; then
+	mount /cdrom/system.?fs /source
+	SYSTEM=/source/system.img
+else
+	SYSTEM=/cdrom/system.img
+fi
+
+mount $SYSTEM /android

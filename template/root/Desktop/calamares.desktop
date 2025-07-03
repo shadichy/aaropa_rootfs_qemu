@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install BlissOS
+GenericName=BlissOS Installer
+Keywords=calamares;system;installer;
+TryExec=calamares
+Exec=/usr/bin/bash -c /usr/bin/aaropa-calamares
+Icon=/etc/bliss/blissos_logo.png
+Terminal=false
+StartupNotify=true
+Categories=Qt;System;
+X-AppStream-Ignore=true
