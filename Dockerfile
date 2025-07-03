@@ -18,7 +18,7 @@ RUN mkdir -p /boot
 RUN grep -Ev '^#' /pkglist.cfg | xargs apt install -y --no-install-recommends --no-install-suggests
 
 # Post-install actions
-RUN rc-update add udhcpc default
+RUN update-rc.d udhcpc defaults
 RUN cp /lib/modules/*/kernel /boot/kernel
 
 # Clean up cache & files
