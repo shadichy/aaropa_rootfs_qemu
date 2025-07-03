@@ -54,8 +54,10 @@ jobs:
           # Create partitions
           sudo parted /dev/nbd0 -s mklabel gpt
           sudo parted /dev/nbd0 -s mkpart ESP fat32 1MiB 101MiB
+          sudo mkfs.vfat -F 32 /dev/nbd0p1
           sudo parted /dev/nbd0 -s set 1 esp on
           sudo parted /dev/nbd0 -s mkpart primary ext4 101MiB 100%
+          sudo mkfs.ext4 -l rootfs /dev/nbd0p2
 
           # Mount image
           mkdir -p rootfs
