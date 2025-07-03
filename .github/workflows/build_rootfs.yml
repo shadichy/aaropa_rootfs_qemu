@@ -72,7 +72,7 @@ jobs:
           sudo mount --bind /dev rootfs/dev
           sudo mount --bind /proc rootfs/proc
           sudo mount --bind /sys rootfs/sys
-          sudo chroot rootfs /bin/bash -c "grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot/efi/AAROPA --bootloader-id=AAROPA --removable --no-nvram; grub-mkconfig -o /boot/efi/AAROPA/grub.cfg 2>&1; :"
+          sudo chroot rootfs /bin/bash -c "grub-install --target=x86_64-efi --efi-directory=/boot/efi --boot-directory=/boot/efi/EFI/AAROPA --bootloader-id=AAROPA --removable --no-nvram; grub-mkconfig -o /boot/efi/EFI/AAROPA/grub/grub.cfg 2>&1; :"
 
           # Detach image
           sudo umount -R rootfs
