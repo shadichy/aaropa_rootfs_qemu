@@ -1,15 +1,15 @@
 #!/bin/bash
 
 set -e
-ISO=$1
+ISO=$(readlink -f "$1")
 
 usage() {
-	cat<<EOF
-Usage: $(basename $0) <iso>
+	cat <<EOF
+Usage: $(basename "$0") <iso>
 EOF
 }
 
-if [ -z "$ISO" ] || [ ! -f "$ISO" ]; then
+if [ -z "$ISO" ] || ! { [ -f "$ISO" ] || [ -b "$ISO" ]; }; then
 	usage
 	exit 1
 fi
