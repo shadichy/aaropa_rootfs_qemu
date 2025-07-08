@@ -6,12 +6,6 @@ COPY scripts /
 
 RUN apt update && apt upgrade -y
 
-# Install additional apt utils 
-RUN apt install -y apt-transport-https ca-certificates
-
-# Re-run apt update after install apt utils
-RUN apt update
-
 # Create needed folders
 RUN mkdir -p /boot
 
