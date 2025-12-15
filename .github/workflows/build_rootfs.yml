@@ -83,7 +83,7 @@ jobs:
           xz -T0 -9e -c aaropa.qcow2 > aaropa.qcow2.xz
 
       - name: Upload QEMU image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: aaropa.qcow2.xz
           path: aaropa.qcow2.xz
